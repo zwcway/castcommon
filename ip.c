@@ -19,19 +19,32 @@
 
 #include <stddef.h>
 #include <memory.h>
-#include <arpa/inet.h>
 #include <stdio.h>
+#include <unistd.h>
+
+#if WIN32
+
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+
+#else
+
+#include <arpa/inet.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
-#include <unistd.h>
 #include <ifaddrs.h>
-
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+
+#endif
+
 
 #include "ip.h"
 #include "speaker_struct.h"
 #include "log.h"
+#include "utils.h"
+#include "error.h"
+#include "common.h"
 
 #define BUFFER_SIZE 4096
 
@@ -39,17 +52,11 @@ static char s[INET6_ADDRSTRLEN];
 
 LOG_TAG_DECLR("common");
 
-struct in6_ifreq {
-    struct in6_addr ifr6_addr;
-    uint32_t ifr6_prefixlen;
-    unsigned int ifr6_ifindex;
-};
-
-int ip_stoa(addr_t *addr, const char *ip) {
+int addr_stoa(addr_t *addr, const char *ip) {
   int ret;
   if (NULL == addr) return -1;
 
-  bzero(addr, sizeof(addr_t));
+  memset(addr, 0, sizeof(addr_t));
 
   ret = inet_pton(AF_INET, ip, &(addr->ipv4.s_addr));
   if (ret != 0) {
@@ -63,15 +70,18 @@ int ip_stoa(addr_t *addr, const char *ip) {
     return ret;
   }
 
-  return ret;
+  return OK;
 }
 
+in_addr_t ip_addr(const char *ip) {
+  return inet_addr(ip);
+}
 
 int is_multicast_addr(const char *ip) {
   addr_t addr;
   uint32_t a;
 
-  if (0 == ip_stoa(&addr, ip)) {
+  if (0 == addr_stoa(&addr, ip)) {
     return 0;
   }
 
@@ -83,7 +93,11 @@ int is_multicast_addr(const char *ip) {
   }
 
   // mask FF02::1/16
+#if WIN32
+  return ntohs(addr.ipv6.u.Word[0]) == 0xFF02;
+#else
   return ntohs(addr.ipv6.s6_addr16[0]) == 0xFF02;
+#endif
 }
 
 int set_sockaddr(struct sockaddr_storage *dst, const addr_t *src, uint32_t port) {
@@ -113,7 +127,7 @@ int set_sockaddr(struct sockaddr_storage *dst, const addr_t *src, uint32_t port)
 
 
 void get_sockaddr(addr_t *dst, const struct sockaddr_storage *src) {
-  bzero(dst, sizeof(addr_t));
+  memset(dst, 0, sizeof(addr_t));
 
   if (src == NULL) {
     return;
@@ -162,9 +176,9 @@ const char *addr_ntop(const addr_t *addr) {
     return s;
   }
   if (addr->type == AF_INET) {
-    inet_ntop(AF_INET, &addr->ipv4, s, INET_ADDRSTRLEN);
+    inet_ntop(AF_INET, (void *) &addr->ipv4, s, INET_ADDRSTRLEN);
   } else if (addr->type == AF_INET6) {
-    inet_ntop(AF_INET6, &addr->ipv6, s, INET6_ADDRSTRLEN);
+    inet_ntop(AF_INET6, (void *) &addr->ipv6, s, INET6_ADDRSTRLEN);
   }
 
   return s;
@@ -176,8 +190,69 @@ const char *mac_ntop(const mac_address_t *mac) {
   return s;
 }
 
+#if WIN32
+
 int list_interfaces(sa_family_t sf, interface_t *ifl, uint8_t max_len) {
-  int sockfd;
+  ULONG outBufLen = 0;
+  DWORD dwRetVal = 0;
+  PIP_ADAPTER_ADDRESSES pAdapterAddrs;
+
+  int l = 0;
+  if (NULL == ifl) return 0;
+
+  pAdapterAddrs = (PIP_ADAPTER_ADDRESSES) malloc(sizeof(IP_ADAPTER_ADDRESSES));
+
+  // retry up to 5 times, to get the adapter address needed
+  for (int i = 0; i < 5 && (dwRetVal == ERROR_BUFFER_OVERFLOW || dwRetVal == NO_ERROR); ++i) {
+    dwRetVal = GetAdaptersAddresses(sf, GAA_FLAG_INCLUDE_ALL_COMPARTMENTS, NULL, pAdapterAddrs, &outBufLen);
+    if (dwRetVal == NO_ERROR) {
+      break;
+    } else if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
+      free(pAdapterAddrs);
+      pAdapterAddrs = (PIP_ADAPTER_ADDRESSES) malloc(outBufLen);
+    } else {
+      pAdapterAddrs = 0;
+      break;
+    }
+  }
+  if (dwRetVal == NO_ERROR) {
+    PIP_ADAPTER_ADDRESSES pAdapterAddr = pAdapterAddrs;
+    while (pAdapterAddr) {
+      strcpy(ifl[l].name, pAdapterAddr->AdapterName);
+      if (sf == AF_INET) {
+        ifl[l].ifindex = (int) pAdapterAddr->IfIndex;
+      } else {
+        ifl[l].ifindex = (int) pAdapterAddr->Ipv6IfIndex;
+      }
+      ifl[l].mtu = (int) pAdapterAddr->Mtu;
+      memcpy(&ifl[l].mac, pAdapterAddr->PhysicalAddress, pAdapterAddr->PhysicalAddressLength);
+
+      PIP_ADAPTER_UNICAST_ADDRESS_LH pIpAddress = pAdapterAddr->FirstUnicastAddress;
+      if (pIpAddress != 0 && l < max_len) {
+        ifl[l].ip.type = pIpAddress->Address.lpSockaddr->sa_family;
+
+        if (pIpAddress->Address.lpSockaddr->sa_family == AF_INET) {
+          memcpy(&ifl[l].ip.ipv4, &((struct sockaddr_in *) pIpAddress->Address.lpSockaddr)->sin_addr,
+                 sizeof(struct in_addr));
+        } else {
+          memcpy(&ifl[l].ip.ipv6, &((struct sockaddr_in6 *) pIpAddress->Address.lpSockaddr)->sin6_addr,
+                 sizeof(struct in6_addr));
+        }
+//        pIpAddress = pIpAddress->Next;
+      }
+      if (l++ >= max_len - 1) {
+        break;
+      }
+      pAdapterAddr = pAdapterAddr->Next;
+    }
+  }
+  free(pAdapterAddrs);
+  return l;
+}
+
+#else
+
+int list_interfaces(sa_family_t sf, interface_t *ifl, uint8_t max_len) {
   struct ifaddrs *ifaddr = NULL, *ifEntry = NULL;
   int i, l;
 
@@ -195,6 +270,8 @@ int list_interfaces(sa_family_t sf, interface_t *ifl, uint8_t max_len) {
     strcpy(ifl[l].name, ifEntry->ifa_name);
     ifl[l].ip.type = sf;
 
+    ifl[l].ifindex = (int) if_nametoindex(ifEntry->ifa_name);
+
     if (sf == AF_INET)
       memcpy(&ifl[l].ip.ipv4, &((struct sockaddr_in *) ifEntry->ifa_addr)->sin_addr, sizeof(struct in_addr));
     else
@@ -207,6 +284,15 @@ int list_interfaces(sa_family_t sf, interface_t *ifl, uint8_t max_len) {
   return l;
 }
 
+#endif
+
+#if WIN32
+
+int get_default_interface(sa_family_t sf, char *name) {
+}
+
+#else
+
 int get_default_interface(sa_family_t sf, char *name) {
   int received_bytes = 0, msg_len = 0, route_attribute_len = 0;
   int sock = -1, msgseq = 0;
@@ -214,7 +300,7 @@ int get_default_interface(sa_family_t sf, char *name) {
   struct rtmsg *route_entry;
   // This struct contain route attributes (route type)
   struct rtattr *route_attribute;
-  char interface[IF_NAMESIZE];
+  char iface[IF_NAMESIZE];
   char msgbuf[BUFFER_SIZE], buffer[BUFFER_SIZE];
   char *ptr = buffer;
   struct timeval tv;
@@ -227,7 +313,7 @@ int get_default_interface(sa_family_t sf, char *name) {
   }
 
   memset(msgbuf, 0, sizeof(msgbuf));
-  memset(interface, 0, sizeof(interface));
+  memset(iface, 0, sizeof(iface));
   memset(buffer, 0, sizeof(buffer));
 
   /* point the header and the msg structure pointers into the buffer */
@@ -296,7 +382,7 @@ int get_default_interface(sa_family_t sf, char *name) {
            route_attribute = RTA_NEXT(route_attribute, route_attribute_len)) {
       switch (route_attribute->rta_type) {
         case RTA_OIF:
-          if_indextoname(*(int *) RTA_DATA(route_attribute), interface);
+          if_indextoname(*(int *) RTA_DATA(route_attribute), iface);
           break;
         case RTA_GATEWAY:
 //            if (sf == AF_INET) {
@@ -310,27 +396,24 @@ int get_default_interface(sa_family_t sf, char *name) {
       }
     }
 
-    if ((*interface)) {
-      memcpy(name, interface, IF_NAMESIZE);
+    if ((*iface)) {
+      memcpy(name, iface, IF_NAMESIZE);
       break;
     }
   }
 
-  close(sock);
+  closesocket(sock);
 
-  return *interface ? 1 : 0;
+  return *iface ? 1 : 0;
 }
 
+#endif
+
+#if WIN32
 
 int get_interface(sa_family_t sf, interface_t *ift, const char *name) {
-  int sockfd;
-  struct ifreq ifr = {0};
-  struct ifaddrs *ifaddr = NULL, *ifEntry = NULL;
-  addr_t addr = {0};
-  int i, found = 0;
-
+  int i, found;
   if (NULL == ift) return -1;
-
   if (NULL == name || strlen(name) == 0) {
     return -1;
   }
@@ -338,73 +421,134 @@ int get_interface(sa_family_t sf, interface_t *ift, const char *name) {
   if (strlen(name) >= IF_NAMESIZE) {
     LOGW("Too long interface name %s", name);
     return -1;
-  } else
-    strcpy(ift->name, name);
-
-  if (ip_stoa(&addr, ift->name)) {
-    return -1;
+  }
+    // ifindex
+  else if ((i = is_uint32(name)) >= 0) {
+    ift->ifindex = i;
   } else {
-    strcpy(ifr.ifr_name, ift->name);
-
-    sockfd = socket(sf, SOCK_DGRAM, 0);
-
-    if (ioctl(sockfd, SIOGIFINDEX, &ifr) < 0) {
-      LOGW("Get interface index '%s' failed: %m", name);
-      return -1;
-    }
-    ift->ifindex = ifr.ifr_ifindex;
-
-    addr.type = sf;
-
-    if (sf == AF_INET) {
-      if (ioctl(sockfd, SIOCGIFADDR, &ifr) != 0) {
-        LOGW("Get address V4 for interface '%s' failed: %m", name);
-        close(sockfd);
-        return -1;
-      }
-      addr.ipv4.s_addr = ((struct sockaddr_in *) &ifr.ifr_addr)->sin_addr.s_addr;
-    } else {
-
-      if (getifaddrs(&ifaddr) != 0) {
-        LOGE("getifaddrs error: %m");
-        return -1;
-      }
-
-      found = 0;
-      for (ifEntry = ifaddr; ifEntry != NULL; ifEntry = ifEntry->ifa_next) {
-        if (ifEntry->ifa_addr->sa_data == NULL || ifEntry->ifa_name == NULL) continue;
-        if (ifEntry->ifa_addr->sa_family != AF_INET6) continue;
-        if (memcmp(ifEntry->ifa_name, name, IFNAMSIZ) != 0) continue;
-
-        found = 1;
-        memcpy(&addr.ipv6, &((struct sockaddr_in6 *) ifEntry->ifa_addr)->sin6_addr, sizeof(struct in6_addr));
-        break;
-      }
-
-      if (!found) {
-        freeifaddrs(ifaddr);
-        LOGW("Get address V6 for interface '%s' failed: %m", name);
-        return -1;
-      }
-      freeifaddrs(ifaddr);
-    }
+    strcpy(ift->name, name);
   }
 
-  memcpy(&ift->ip, &addr, sizeof(addr));
-  bzero(&ift->mac, sizeof(mac_address_t));
+  // do not support ip address
+  if (addr_stoa(&ift->ip, ift->name)) {
+    return -1;
+  }
 
-  if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) == 0 &&
-      !(ifr.ifr_flags & IFF_LOOPBACK) && // don't count loopback
-      ioctl(sockfd, SIOCGIFHWADDR, &ifr) == 0)
-    memcpy(&ift->mac, ifr.ifr_hwaddr.sa_data, sizeof(ift->mac));
+  interface_t list[16] = {0};
+
+  int maxlen = list_interfaces(sf, list, 16);
+
+  found = -1;
+  for (i = 0; i < maxlen; ++i) {
+    if (ift->ifindex) {
+      if (ift->ifindex != list[i].ifindex)
+        continue;
+    } else if (strcmp(ift->name, list[i].name) != 0)
+      continue;
+
+    found = 1;
+    memcpy(ift, &list[i], sizeof(interface_t));
+    break;
+  }
+
+  return found;
+}
+
+#else
+
+int get_interface(sa_family_t sf, interface_t *ift, const char *name) {
+  int sockfd;
+  struct ifreq ifr = {0};
+  struct ifaddrs *ifaddr = NULL, *ifEntry = NULL;
+  int i, found = 0;
+
+  if (NULL == ift) return -1;
+
+  if (NULL == name || strlen(name) == 0) {
+    return -1;
+  }
+  if (strlen(name) >= IF_NAMESIZE) {
+    LOGW("Too long interface name %s", name);
+    return -1;
+  } else if ((i = is_uint32(name)) >= 0) {
+    if (NULL == if_indextoname(i, ift->name)) {
+      LOGW("get name by index error: %m");
+      return -1;
+    }
+  } else {
+    strcpy(ift->name, name);
+  }
+
+  // do not support ip address
+  if (addr_stoa(&ift->ip, ift->name)) {
+    return -1;
+  }
+
+  if (getifaddrs(&ifaddr) != 0) {
+    LOGE("getifaddrs error: %m");
+    return -1;
+  }
+
+  found = 0;
+  for (ifEntry = ifaddr; ifEntry != NULL; ifEntry = ifEntry->ifa_next) {
+    if (ifEntry->ifa_addr->sa_data == NULL || ifEntry->ifa_name == NULL) continue;
+    if (ifEntry->ifa_addr->sa_family != AF_INET6) continue;
+    if (strcmp(ifEntry->ifa_name, ift->name) != 0) continue;
+
+    found = 1;
+
+    ift->ip.type = sf;
+    ift->ifindex = (int) if_nametoindex(ifEntry->ifa_name);
+
+    if (sf == AF_INET)
+      memcpy(&ift->ip.ipv4, &((struct sockaddr_in *) ifEntry->ifa_addr)->sin_addr, sizeof(struct in_addr));
+    else
+      memcpy(&ift->ip.ipv6, &((struct sockaddr_in6 *) ifEntry->ifa_addr)->sin6_addr, sizeof(struct in6_addr));
+
+    break;
+  }
+
+  if (!found) {
+    freeifaddrs(ifaddr);
+    LOGW("Get address V6 for interface '%s' failed: %m", name);
+    return -1;
+  }
+  freeifaddrs(ifaddr);
+
+  sockfd = socket(sf, SOCK_DGRAM, 0);
+  if (sockfd < 0) {
+    LOGW("create socket error: %m");
+    return -1;
+  }
+  bzero(&ift->mac, sizeof(mac_address_t));
+  strcpy(ifr.ifr_name, ift->name);
+
+  if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) < 0) {
+    closesocket(sockfd);
+    LOGW("Get IF flags Fail: %s", name);
+    return -1;
+  }
+  if (ifr.ifr_flags & IFF_LOOPBACK) {
+    closesocket(sockfd);
+    LOGW("Can not count loopback");
+    return -1;
+  }
+  if (ioctl(sockfd, SIOCGIFHWADDR, &ifr) < 0) {
+    closesocket(sockfd);
+    LOGW("Get mac address error: %m");
+    return -1;
+  }
+  memcpy(&ift->mac, ifr.ifr_hwaddr.sa_data, sizeof(ift->mac));
 
   if (ioctl(sockfd, SIOCGIFMTU, &ifr) != 0) {
     LOGW("Get MTU Fail: %s\n\n", name);
-    close(sockfd);
+    closesocket(sockfd);
     return -1;
   }
   ift->mtu = ifr.ifr_mtu;
 
-  close(sockfd);
+  closesocket(sockfd);
   return 0;
 }
+
+#endif

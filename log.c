@@ -21,6 +21,11 @@
 #include <stdlib.h>
 #include "log.h"
 
+#if WIN32
+
+#include <windows.h>
+
+#endif
 
 #define MAX_CALLBACKS 32
 
@@ -228,13 +233,47 @@ int log_add_fp(FILE *fp, int level)
 }
 
 
-static void init_event(log_Event *ev, void *udata)
-{
+static void init_event(log_Event *ev, void *udata) {
   if (!ev->time) {
     time_t t = time(NULL);
     ev->time = localtime(&t);
   }
   ev->udata = udata;
+
+#if WIN32
+  char *s;
+  char *fmt = NULL;
+  int offset, flen, len;
+  if (NULL != (s = strstr(ev->fmt, "%m"))) {
+    if (s == ev->fmt || *(s - 1) != '%') {
+      // 替换 %m 为错误信息，多语言。
+      offset = (int) (s - ev->fmt);
+      wchar_t *err = NULL;
+      FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                     NULL, WSAGetLastError(),
+                     MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                     (LPWSTR) &err, 0, NULL);
+      len = WideCharToMultiByte(CP_ACP, 0, err, -1, NULL, 0, NULL, NULL);
+      flen = (int) strlen(ev->fmt) - 2 + len;
+
+      // free 在 log_log 函数尾
+      fmt = malloc(flen + 1);
+
+      memset(fmt, 0, len + 1);
+      strncpy(fmt, ev->fmt, offset);
+
+      WideCharToMultiByte(CP_ACP, 0, err, -1, fmt + offset, len, NULL, NULL);
+
+      // 强制不换行
+      if (NULL != (s = strchr(fmt, '\r'))) *s = ' ';
+      if (NULL != (s = strchr(fmt, '\n'))) *s = ' ';
+
+      strcat(fmt, ev->fmt + offset + 2);
+      LocalFree(err);
+      ev->fmt = fmt;
+    }
+  }
+#endif
 }
 
 
@@ -292,5 +331,8 @@ void log_log(const char *tag, int level, const char *file, int line, const char 
     }
   }
 
+  if (ev.fmt != fmt) {
+    free((char *) ev.fmt);
+  }
   unlock();
 }

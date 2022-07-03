@@ -20,8 +20,8 @@
 #include <malloc.h>
 #include <pthread.h>
 #include <memory.h>
-#include <bits/types/struct_timeval.h>
 #include <sys/time.h>
+#include <string.h>
 #include "block_queue.h"
 #include "log.h"
 
@@ -63,19 +63,23 @@ queue_t *queue_create(const char *name, uint32_t data_size, uint32_t length, que
   return q;
 }
 
-queue_ret_t queue_destory(queue_t *q)
-{
+queue_ret_t queue_destory(queue_t *q) {
   if (NULL == q) return QUEUE_NOT_EXIST;
+
+  if (!q->data || !q->lock.inited) return QUEUE_OK;
+
+  q->lock.inited = 0;
 
   pthread_mutex_destroy(&q->lock.mutex);
 
   pthread_cond_destroy(&q->lock.push_cond);
   pthread_cond_destroy(&q->lock.pop_cond);
 
-  if (NULL != q->data)free(q->data);
-  q->data = 0;
+  if (NULL != q->data) {
+    free(q->data);
+    q->data = 0;
+  }
   free(q);
-  q = 0;
 
   return QUEUE_OK;
 }

@@ -16,11 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#if WIN32
 
+#include "winsock2.h"
+
+#else
 #include <sys/select.h>
+#endif
+
 #include "../log.h"
 #include "../block_queue.h"
-#include "../castspeaker.h"
+#include "../common.h"
 #include <unistd.h>
 #include <error.h>
 #include "../error.h"
@@ -71,25 +77,26 @@ int select_stop_process()
   return OK;
 }
 
-int select_process()
-{
+int select_process() {
   int ready, n, rn;
-  int max_fd = 0;
+  int max_fd = -1;
   connection_t *c;
   static struct timeval tv = {0};
 
   FD_ZERO(&readfds);
   FD_ZERO(&writefds);
 
-  FD_SET(wakeup_fd[0], &readfds);
+  ADD_THREAD_CMD(&readfds);
 
   for (int i = 0; i < conn_cnt; ++i) {
     c = conns[i];
     FD_SET(c->read_fd, &readfds);
 
+#ifndef WIN32
     if (max_fd < c->read_fd) {
       max_fd = c->read_fd;
     }
+#endif
   }
 
   tv.tv_sec = 3;
@@ -110,9 +117,6 @@ int select_process()
   n = rn = 0;
   for (int i = 0; i < conn_cnt; ++i) {
     c = conns[i];
-    if (FD_ISSET(wakeup_fd[0], &readfds)) {
-      return ERROR_EXIT;
-    }
     if (FD_ISSET(c->read_fd, &readfds)) {
       if (c->readed) {
         c->readed = 0;
@@ -122,7 +126,7 @@ int select_process()
       }
       n++;
     }
-    CHK_CMD_EXIT_THREAD();
+    CHK_CMD_EXIT_THREAD(&readfds);
   }
 
   if (ready != n) {

@@ -17,11 +17,9 @@
 */
 
 
-#include <net/if.h>
-#include <arpa/inet.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
+#include <math.h>
 #include "utils.h"
 #include "speaker_struct.h"
 #include "log.h"
@@ -57,4 +55,20 @@ uint32_t samples_chunk(uint32_t per_sec, chunk_type_t type) {
   }
 
   return 0;
+}
+
+int32_t is_uint32(const char *str) {
+  int i = (int) strlen(str), n = 0;
+  if (i <= 0) return -1;
+
+  while (*str != '\0') {
+    if (*str >= '0' && *str <= '9') {
+      n += pow(10, --i) * (*str - '0');
+    } else {
+      return -1;
+    }
+    str++;
+  }
+
+  return n;
 }

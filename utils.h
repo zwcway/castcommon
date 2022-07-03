@@ -22,7 +22,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <netinet/in.h>
 #include "speaker_struct.h"
 
 
@@ -43,5 +42,6 @@ inline static void *xmalloc(size_t len)
 
 uint32_t samples_chunk(uint32_t per_sec, chunk_type_t type);
 
+int32_t is_uint32(const char *str);
 
 #endif

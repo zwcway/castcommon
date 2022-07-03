@@ -20,7 +20,7 @@
 #include <stddef.h>
 #include <pthread.h>
 #include "../log.h"
-#include "../castspeaker.h"
+#include "../common.h"
 #include "../error.h"
 #include "receive.h"
 

@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <unistd.h>
 #include "event.h"
 #include "../error.h"
 #include "select.h"
@@ -56,8 +57,12 @@ int event_deinit() {
 }
 
 int event_start() {
-  if (event_) event_->start_process();
+  int ret = 0;
+  if (event_) ret = event_->start_process();
 
+  if (ret < 0) {
+    sleep(1);
+  }
   return OK;
 }
 
