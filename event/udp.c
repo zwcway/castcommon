@@ -18,11 +18,10 @@
 
 
 #include <stddef.h>
-#include <sys/socket.h>
 #include <pthread.h>
 #include <errno.h>
 #include "../log.h"
-#include "../castspeaker.h"
+#include "../common.h"
 #include "../connection.h"
 #include "../block_queue.h"
 #include "udp.h"
@@ -129,13 +128,18 @@ queue_t *udp_init(const queue_t *event_queue, uint32_t buf_size, uint32_t qlen) 
   return recv_queue;
 }
 
-int udp_deinit()
-{
+int udp_deinit() {
   LOGT("udp deinit");
 
-  pthread_cancel(recv_thread);
+  if (recv_thread) {
+    pthread_cancel(recv_thread);
+    recv_thread = 0;
+  }
 
-  queue_destory(recv_queue);
+  if (recv_queue) {
+    queue_destory(recv_queue);
+    recv_queue = 0;
+  }
 
   return 0;
 }

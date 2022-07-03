@@ -21,7 +21,7 @@
 #define BLOCK_QUEUE_H
 
 #include <stdint.h>
-#include <bits/pthreadtypes.h>
+#include <pthread.h>
 
 
 typedef struct queue_s

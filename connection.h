@@ -21,7 +21,15 @@
 #define CONNECTION_H
 
 #include <stdint-gcc.h>
+
+#if WIN32
+
+#include <winsock2.h>
+#include <wspiapi.h>
+
+#else
 #include <sys/socket.h>
+#endif
 
 
 typedef struct connection_s connection_t;

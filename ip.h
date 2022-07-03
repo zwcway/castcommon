@@ -20,11 +20,22 @@
 #ifndef IP_H
 #define IP_H
 
+#if WIN32
+
+#include <ws2tcpip.h>
+#include <netioapi.h>
+
+typedef int sa_family_t;
+typedef u_long in_addr_t;
+#else
 #include <netinet/in.h>
 #include <net/if.h>
+#endif
+
+#include <stdint-gcc.h>
 
 typedef struct addr_s {
-    sa_family_t type: 4;
+    sa_family_t type;
     union {
         struct in_addr ipv4;
         struct in6_addr ipv6;
@@ -52,7 +63,9 @@ typedef struct interface_s {
 
 int is_multicast_addr(const char *ip);
 
-int ip_stoa(addr_t *addr, const char *ip);
+int addr_stoa(addr_t *addr, const char *ip);
+
+in_addr_t ip_addr(const char *ip);
 
 int set_sockaddr(struct sockaddr_storage *__restrict dst, const addr_t *__restrict src, uint32_t port);
 

@@ -23,7 +23,6 @@
 #include <stdint-gcc.h>
 #include "audio.h"
 #include "ip.h"
-#include <netinet/in.h>
 
 
 #define DEFAULT_MULTICAST_GROUP "239.44.77.16"

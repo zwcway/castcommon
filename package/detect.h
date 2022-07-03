@@ -21,8 +21,8 @@
 #define PACKAGE_DETECT_H
 
 
-#include "../audio.h"
-#include "../speaker_struct.h"
+#include <common/audio.h>
+#include <common/speaker_struct.h>
 
 typedef enum detect_connect_e {
     DETECT_SERVER_CONNECTED = 1,
