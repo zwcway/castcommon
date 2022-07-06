@@ -116,7 +116,7 @@ int set_sockaddr(struct sockaddr_storage *dst, const addr_t *src, uint32_t port)
     return sizeof(struct sockaddr_in);
   } else if (src->type == AF_INET6) {
     v6->sin6_family = AF_INET6;
-    memcpy(&v6->sin6_addr, &src->ipv6, sizeof(struct in6_addr));
+    v6->sin6_addr = src->ipv6;
     v6->sin6_port = htons(port);
 
     return sizeof(struct sockaddr_in6);
@@ -138,7 +138,7 @@ void get_sockaddr(addr_t *dst, const struct sockaddr_storage *src) {
   if (src->ss_family == AF_INET) {
     dst->ipv4.s_addr = ((struct sockaddr_in *) src)->sin_addr.s_addr;
   } else if (src->ss_family == AF_INET6) {
-    memcpy(&dst->ipv6, &((struct sockaddr_in6 *) src)->sin6_addr, sizeof(struct in6_addr));
+    dst->ipv6 = ((struct sockaddr_in6 *) src)->sin6_addr;
   }
 }
 
@@ -232,11 +232,9 @@ int list_interfaces(sa_family_t sf, interface_t *ifl, uint8_t max_len) {
         ifl[l].ip.type = pIpAddress->Address.lpSockaddr->sa_family;
 
         if (pIpAddress->Address.lpSockaddr->sa_family == AF_INET) {
-          memcpy(&ifl[l].ip.ipv4, &((struct sockaddr_in *) pIpAddress->Address.lpSockaddr)->sin_addr,
-                 sizeof(struct in_addr));
+          ifl[l].ip.ipv4 = ((struct sockaddr_in *) pIpAddress->Address.lpSockaddr)->sin_addr;
         } else {
-          memcpy(&ifl[l].ip.ipv6, &((struct sockaddr_in6 *) pIpAddress->Address.lpSockaddr)->sin6_addr,
-                 sizeof(struct in6_addr));
+          ifl[l].ip.ipv6 = ((struct sockaddr_in6 *) pIpAddress->Address.lpSockaddr)->sin6_addr;
         }
 //        pIpAddress = pIpAddress->Next;
       }
@@ -273,9 +271,9 @@ int list_interfaces(sa_family_t sf, interface_t *ifl, uint8_t max_len) {
     ifl[l].ifindex = (int) if_nametoindex(ifEntry->ifa_name);
 
     if (sf == AF_INET)
-      memcpy(&ifl[l].ip.ipv4, &((struct sockaddr_in *) ifEntry->ifa_addr)->sin_addr, sizeof(struct in_addr));
+      ifl[l].ip.ipv4 = ((struct sockaddr_in *) ifEntry->ifa_addr)->sin_addr;
     else
-      memcpy(&ifl[l].ip.ipv6, &((struct sockaddr_in6 *) ifEntry->ifa_addr)->sin6_addr, sizeof(struct in6_addr));
+      ifl[l].ip.ipv6 = ((struct sockaddr_in6 *) ifEntry->ifa_addr)->sin6_addr;
 
     l++;
   }
@@ -427,11 +425,11 @@ int get_interface(sa_family_t sf, interface_t *ift, const char *name) {
     ift->ifindex = i;
   } else {
     strcpy(ift->name, name);
-  }
 
-  // do not support ip address
-  if (addr_stoa(&ift->ip, ift->name)) {
-    return -1;
+    // do not support ip address
+    if (addr_stoa(&ift->ip, ift->name)) {
+      return -1;
+    }
   }
 
   interface_t list[16] = {0};
@@ -447,7 +445,7 @@ int get_interface(sa_family_t sf, interface_t *ift, const char *name) {
       continue;
 
     found = 1;
-    memcpy(ift, &list[i], sizeof(interface_t));
+    *ift = list[i];
     break;
   }
 
@@ -492,7 +490,7 @@ int get_interface(sa_family_t sf, interface_t *ift, const char *name) {
   found = 0;
   for (ifEntry = ifaddr; ifEntry != NULL; ifEntry = ifEntry->ifa_next) {
     if (ifEntry->ifa_addr->sa_data == NULL || ifEntry->ifa_name == NULL) continue;
-    if (ifEntry->ifa_addr->sa_family != AF_INET6) continue;
+    if (ifEntry->ifa_addr->sa_family != sf) continue;
     if (strcmp(ifEntry->ifa_name, ift->name) != 0) continue;
 
     found = 1;
@@ -501,9 +499,9 @@ int get_interface(sa_family_t sf, interface_t *ift, const char *name) {
     ift->ifindex = (int) if_nametoindex(ifEntry->ifa_name);
 
     if (sf == AF_INET)
-      memcpy(&ift->ip.ipv4, &((struct sockaddr_in *) ifEntry->ifa_addr)->sin_addr, sizeof(struct in_addr));
+      ift->ip.ipv4 = ((struct sockaddr_in *) ifEntry->ifa_addr)->sin_addr;
     else
-      memcpy(&ift->ip.ipv6, &((struct sockaddr_in6 *) ifEntry->ifa_addr)->sin6_addr, sizeof(struct in6_addr));
+      ift->ip.ipv6 = ((struct sockaddr_in6 *) ifEntry->ifa_addr)->sin6_addr;
 
     break;
   }

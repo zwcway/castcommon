@@ -106,8 +106,8 @@ typedef struct speaker_flat_list_t
 #define SPEAKER_STRUCT_INIT(sp, d, m, a, c) \
   (sp).idx = 0; \
   (sp).id = d; \
-memcpy(&(sp).mac, (m), sizeof(mac_address_t)); \
-memcpy(&(sp).ip, (a), sizeof(addr_t));\
+(sp).mac = *(m); \
+(sp).ip = *(a);\
 (sp).state = SPEAKER_STAT_OFFLINE; \
 (sp).line = DEFAULT_LINE; \
 (sp).channel = c;
@@ -119,8 +119,8 @@ memcpy(&(sp).ip, (a), sizeof(addr_t));\
     (sp)->rate_mask = (hd)->rate_mask;              \
     (sp)->bits_mask = (hd)->bits_mask;              \
     (sp)->dport = (hd)->data_port;                  \
-    memcpy(&(sp)->mac, &(hd)->mac, sizeof(mac_address_t)); \
-    memcpy(&(sp)->ip, &(hd)->addr, sizeof(addr_t)); \
+    (sp)->mac = (hd)->mac;                          \
+    (sp)->ip = (hd)->addr;                          \
     (sp)->state = SPEAKER_STAT_OFFLINE;             \
     (sp)->line = DEFAULT_LINE;                      \
     (sp)->channel = c;                              \

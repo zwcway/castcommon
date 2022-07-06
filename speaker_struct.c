@@ -163,7 +163,7 @@ void pack_list_by_ch__(speaker_list_t *list) {
         break;
       }
       if (j < list->len && ns != NULL) {
-        memcpy(sp, ns, sizeof(speaker_t));
+        *sp = *ns;
         if (sp != NULL) sp->idx = i;
         ns->state = SPEAKER_STAT_DELETED;
         d++;

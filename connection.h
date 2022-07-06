@@ -21,6 +21,8 @@
 #define CONNECTION_H
 
 #include <stdint-gcc.h>
+#include "ip.h"
+#include "common.h"
 
 #if WIN32
 
@@ -44,15 +46,15 @@ typedef int (*write_fn)();
 
 typedef void (*recv_refuse)();
 
-#define DEFAULT_CONNECTION_UDP_INIT {0, 0, 0, 1, NULL, NULL};
+#define DEFAULT_CONNECTION_UDP_INIT {0, 0, 0, 0, 1, NULL, NULL};
 
 
-struct connection_s
-{
-    int read_fd;
+struct connection_s {
+    socket_t read_fd;
     uint32_t index;
-    unsigned tcp;
-    unsigned readed;
+    sa_family_t family;
+    uint8_t tcp;
+    uint8_t readed;
     read_fn read_cb;
     recv_refuse refuse_cb;
 };

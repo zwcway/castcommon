@@ -22,9 +22,12 @@
 #include "select.h"
 #include "udp.h"
 #include "receive.h"
+#include "../log.h"
 
 event_t *event_ = NULL;
 protocol_t *protocol_ = NULL;
+
+LOG_TAG_DECLR("event");
 
 int event_init(enum event_type_e type, enum event_protocol_e protocol, uint32_t buf_size, uint32_t qlen) {
   switch (type) {
@@ -73,6 +76,10 @@ int event_stop() {
 }
 
 int event_add(connection_t *c) {
+  if (NULL == c || !c->read_fd || !c->family) {
+    LOGE("connection error");
+    return ERROR_ARG;
+  }
   if (event_) return event_->add_connection(c);
 
   return OK;

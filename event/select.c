@@ -37,7 +37,7 @@ static fd_set readfds;
 static fd_set writefds;
 
 static connection_t *conns[1024];
-static uint32_t conn_cnt;
+static uint32_t conn_cnt = 0;
 
 static queue_t *queue = NULL;
 DECL_THREAD_CMD();
@@ -57,7 +57,7 @@ int select_del_connection(const connection_t *c)
 {
   connection_t *tmp;
 
-  if (conns[c->index] != c) {
+  if (conns[c->index] != c || conn_cnt <= 0) {
     return OK;
   }
 
@@ -79,7 +79,7 @@ int select_stop_process()
 
 int select_process() {
   int ready, n, rn;
-  int max_fd = -1;
+  socket_t max_fd = -1;
   connection_t *c;
   static struct timeval tv = {0};
 
@@ -92,17 +92,19 @@ int select_process() {
     c = conns[i];
     FD_SET(c->read_fd, &readfds);
 
-#ifndef WIN32
     if (max_fd < c->read_fd) {
       max_fd = c->read_fd;
     }
-#endif
   }
 
   tv.tv_sec = 3;
   tv.tv_usec = 0;
 
-  ready = select(max_fd + 1, &readfds, &writefds, NULL, &tv);
+#if WIN32
+  ready = select(0, &readfds, NULL, NULL, &tv);
+#else
+  ready = select(max_fd + 1, &readfds, NULL, NULL, &tv);
+#endif
 
   if (ready < 0) {
     LOGE("select error: %m");

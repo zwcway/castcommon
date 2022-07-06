@@ -22,6 +22,7 @@
 
 
 #include "../audio.h"
+#include "../common.h"
 
 
 typedef enum control_command_e {
@@ -33,19 +34,17 @@ typedef enum control_command_e {
     SPCMD_UNKNOWN_SP = 0xFF,
 } control_command_t;
 
-typedef struct control_package_s
-{
-    control_command_t cmd: 8;
+typedef struct control_package_s {
+    control_command_t cmd;
     uint32_t spid;
-    union
-    {
-        struct
-        {
-            audio_bits_t bits: 8;
-            audio_rate_t rate: 8;
+    union {
+        struct {
+            audio_bits_t bits: 4;
+            audio_rate_t rate: 4;
             audio_channel_t channel: 8;
-            uint8_t reseved: 8;
+            uint16_t reseved: 16;
         } sample;
+
         struct {
             uint16_t size: 16;
             uint16_t reseved: 16;
@@ -59,8 +58,11 @@ typedef struct control_resp_s {
 } control_resp_t;
 
 
-#define CONTROL_PACKAGE_SIZE \
-    sizeof(control_package_t)
+#define CONTROL_PACKAGE_SIZE  (9)
+
+void CONTROL_PACKAGE_ENCODE(void *pack, const control_package_t *ctl);
+
+void CONTROL_PACKAGE_DECODE(control_package_t *ctl, const void *pack);
 
 /**
  *  header size

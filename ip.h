@@ -54,11 +54,15 @@ typedef struct interface_s {
     char name[IF_NAMESIZE];
 } interface_t;
 
+#define EQUAL_SOCK_ADDR(s, a) \
+    ((s)->ss_family == AF_INET ? \
+    ((struct sockaddr_in *) (s))->sin_addr.s_addr == (a)->ipv4.s_addr : \
+    memcmp(&((struct sockaddr_in6 *) (s))->sin6_addr, &(a)->ipv6, sizeof(struct in6_addr)) == 0)
 
-#define SOCKADDR_SIZE(s) \
-    ( (s)->ss_family == AF_INET ? \
+#define SOCKADDR_SIZE(family) \
+    ( (family) == AF_INET ? \
       sizeof(struct sockaddr_in) : \
-      ((s)->ss_family == AF_INET6 ? sizeof(struct sockaddr_in6) : 0) )
+      ( (family) == AF_INET6 ? sizeof(struct sockaddr_in6) : 0) )
 
 
 int is_multicast_addr(const char *ip);

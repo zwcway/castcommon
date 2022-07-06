@@ -20,11 +20,11 @@
 #ifndef PACKAGE_PCM_H
 #define PACKAGE_PCM_H
 
+#include "../common.h"
 #include "../audio.h"
 
 
-typedef enum header_compress_s
-{
+typedef enum header_compress_s {
     COMPRESS_NONE = 0,
 } header_compress_t;
 
@@ -33,7 +33,7 @@ typedef struct header_sample_s {
     audio_bits_t bits: 4;                  /* 采样位深 */
     audio_channel_mask_t channel_mask;     /* 总声道 */
     audio_channel_t channel: 8;            /* 当前声道 */
-} __attribute__((packed)) header_sample_t;
+} header_sample_t;
 
 typedef struct channel_header_s {
 //    uint8_t crc :8;                         /* CRC 校验*/
@@ -41,15 +41,19 @@ typedef struct channel_header_s {
     header_compress_t compress: 4;          /* 压缩方式 */
     header_sample_t sample;                 /* pcm format */
     uint16_t seq;                           /* 序号 */
+    uint32_t time;                          /* 时间 */
     uint16_t len;                           /* 长度 */
-}__attribute__((packed)) channel_header_t;
+} pcm_header_t;
 
-typedef struct channel_resp_t
-{
+typedef struct channel_resp_t {
     int32_t maigc;
 } channel_resp_t;
 
-#define CHANNEL_HEADER_SIZE (sizeof(channel_header_t))
-#define PACKAGE_HEADER_SIZE        (sizeof(channel_header_t))
+void PCM_HEADER_ENCODE(void *pack, const pcm_header_t *hd);
+
+void PCM_HEADER_DECODE(pcm_header_t *hd, const void *pack);
+
+#define CHANNEL_HEADER_SIZE (sizeof(pcm_header_t))
+#define PCM_HEADER_SIZE    11
 
 #endif //PACKAGE_PCM_H

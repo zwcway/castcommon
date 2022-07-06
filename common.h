@@ -29,6 +29,7 @@
 #define SOCKET_QUIT_MAGIC_SIZE  4
 
 #if WIN32
+typedef int64_t socket_t;
 #define SOCKET_INIT()             do { \
 WSADATA wsaData = {0};                 \
 int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData); \
@@ -50,7 +51,9 @@ return ERROR_EXIT;}while(0)
 #elif ESP_PLATFORM
 
 #define sexit(n)                  return (n);
+
 #else
+typedef int32_t socket_t;
 #define SOCKET_INIT()             do {}while(0)
 #define SOCKET_DEINIT()           ;
 #define DECL_THREAD_CMD()         static int wakeup_fd[2] = {0}; static char _buf[SOCKET_QUIT_MAGIC_SIZE] = {0};
@@ -76,6 +79,9 @@ return ERROR_EXIT; }while(0)
 memcmp((buf), SOCKET_QUIT_MAGIC, SOCKET_QUIT_MAGIC_SIZE) == 0)) \
 goto exit_thread
 
+
+#define BIT_4TO8(a, b)      ( (((a) & 0x0F) << 4) | (((b) & 0x0F) << 0) )
+#define BIT_8TO4(a, b, s)   ( (a) = (s) >> 4 , (b) = (s) & 0x0F )
 
 typedef enum run_mode_t {
     RUN_MODE_SERVER,
