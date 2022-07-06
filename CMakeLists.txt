@@ -26,6 +26,8 @@ SET(COMMON_SOURCES
     event/send.c
     event/udp.c
 
+    package/package.c
+
     pipeline/element.c
     pipeline/pipeline.c
     )

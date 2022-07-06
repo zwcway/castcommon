@@ -59,7 +59,6 @@ static struct
     Callback callbacks[MAX_CALLBACKS];
 } L;
 
-
 static const char *level_strings[] = {
   "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"
 };
@@ -134,12 +133,22 @@ void log_set_level(int level)
 
 void log_add_filter(const char *name, int level)
 {
-  if (L.filter_len >= MAX_FILTERS) return;
+  struct Filter *f = NULL;
 
-  strncpy(L.filter[L.filter_len].name, name, 15);
-  L.filter[L.filter_len].level = level;
+  for (int i = 0; i < L.filter_len; i++) {
+    if (strcmp(L.filter[i].name, name) == 0) {
+      f = &L.filter[i];
+      break;
+    }
+  }
+  if (f == NULL) {
+    if (L.filter_len >= MAX_FILTERS) return;
 
-  L.filter_len++;
+    f = &L.filter[L.filter_len++];
+
+    strncpy(f->name, name, 15);
+  }
+  f->level = level;
 }
 
 int parse_level_string(const char *s)
@@ -149,7 +158,7 @@ int parse_level_string(const char *s)
 
   for (int i = 0; i < 6; ++i) {
     if (strcasecmp(s, level_strings[i]) == 0)
-      return LOG_TRACE;
+      return i;
   }
 
   loglevel = (int) strtol(s, &end, 10);
@@ -171,9 +180,9 @@ int log_set_level_from_string(const char *level)
 {
   if (level == NULL) return -1;
 
-  int loglevel = LOG_INFO, f = 0, i = 0;
+  int loglevel = LOG_INFO;
   char *str = strdup(level);
-  char *s = str, *t, *k;
+  char *s = str, *t, *k, *name;
 
   do {
     t = strchr(s, ',');
@@ -186,22 +195,23 @@ int log_set_level_from_string(const char *level)
       if ((loglevel = parse_level_string(s)) < 0) return -1;
 
       log_set_level(loglevel);
-      return 0;
+      if (t == NULL) break;
+      s = t + 1;
+      continue;
+//      return 0;
     }
 
     *k = '\0';
-    strcpy(L.filter[f].name, s);
+    name = s;
     s = k + 1;
 
     if ((loglevel = parse_level_string(s)) < 0) return -1;
 
-    L.filter[f].level = loglevel;
-
-    f++;
+    log_add_filter(name, loglevel);
 
     if (NULL == t) break;
     s = t + 1;
-  } while (*s != '\0' && f < MAX_FILTERS);
+  } while (*s != '\0' && L.filter_len < MAX_FILTERS);
 
   free(str);
 
@@ -281,7 +291,7 @@ static const char *simple_file(const char *file)
 {
   char *pos = (char *) file, *s = (char *) file;
   while (*s != '\0') {
-    if (*s == '/') pos = s + 1;
+    if (*s == '/' || *s == '\\') pos = s + 1;
     s++;
   }
   return pos;

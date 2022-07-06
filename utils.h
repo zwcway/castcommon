@@ -27,14 +27,14 @@
 
 #define FLOAT_IS_NUMBER(i) ((i) - (int)(i) == 0)
 
-typedef enum chunk_type_t
-{
+#define memvcmp(s, v, l)      ( *(__typeof__ (v) *)(s) == (v) && memcmp((s), (s) + sizeof(v), l - sizeof(v)) == 0 )
+
+typedef enum chunk_type_t {
     CHUNK_QUALITY = 1,  // more delay
     CHUNK_SPEED,        // may drop some data
 } chunk_type_t;
 
-inline static void *xmalloc(size_t len)
-{
+inline static void *xmalloc(size_t len) {
   void *a = malloc(len);
   if (a == NULL) perror("malloc error"), exit(255);
   return a;

@@ -20,6 +20,7 @@
 #include <stddef.h>
 #include <pthread.h>
 #include <errno.h>
+#include <string.h>
 #include "../log.h"
 #include "../common.h"
 #include "../connection.h"
@@ -49,14 +50,14 @@ static int push_recv(void *arg, queue_t *q, void *data, uint32_t size) {
   recv_data_t *ud = (recv_data_t *) data;
 
   ud->conn = c;
-  ud->src_len = sizeof(ud->src);
+  ud->src_len = SOCKADDR_SIZE(c->family);
 
   LOGT("recvfrom start");
   ssize_t s = recvfrom(c->read_fd,
                        data + RECVDATA_SIZE, size - RECVDATA_SIZE,
                        0,
                        (struct sockaddr *) &ud->src, &ud->src_len);
-  LOGT("recvfrom received %d from %s:%d (%d)", s, sockaddr_ntop(&ud->src), sockaddr_port(&ud->src), ud->src_len);
+
   if (0 > s) {
     LOGE("recvfrom error: %m");
     if (errno == ECONNREFUSED) {

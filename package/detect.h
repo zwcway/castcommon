@@ -21,8 +21,8 @@
 #define PACKAGE_DETECT_H
 
 
-#include <common/audio.h>
-#include <common/speaker_struct.h>
+#include "../audio.h"
+#include "../speaker_struct.h"
 
 typedef enum detect_connect_e {
     DETECT_SERVER_CONNECTED = 1,
@@ -43,8 +43,7 @@ typedef struct detect_request_s {
     uint16_t data_port;
 } detect_request_t;
 
-#if PACKAGE_PACKED
-#define DETECT_PACKAGE_SIZE(sf)  ((sf) == AF_INET ? 20 : 32)
+#define DETECT_REQUEST_SIZE(sf)  ((sf) == AF_INET ? 20 : 32)
 
 // ┌───────┬──────┬────────────┬────────────┬──────────┬──────────┬─────────┬────────────┬────────────┬────────────┐
 // │ name  │ ver  │ connected  │ addr.type  │ addr.ip  │ id       │ mac     │ rate_mask  │ bits_mask  │ data_port  │
@@ -54,69 +53,9 @@ typedef struct detect_request_s {
 // │ ipv6  │ 0-3  │ 4          │ 5          │ 8-135    │ 136-167  │ 168-215 │ 216-231    │ 232-239    │ 240-255    │
 // └───────┴──────┴────────────┴────────────┴──────────┴──────────┴─────────┴────────────┴────────────┴────────────┘
 
-#define DETECT_PACKAGE_ENCODE(sf, d, p) do { \
-    uint8_t *ptr = (uint8_t *)(d);           \
-    \
-    *((uint8_t*)(ptr)) = (((p)->ver & 0x0F) << 4) | ((!!(p)->connected) << 3) | (((p)->addr.type == AF_INET6) << 2); \
-    ptr += 1;                                \
-    \
-    memcpy(ptr, &(p)->addr.ipv6, (sf) == AF_INET ? 4 : 16);\
-    ptr += (sf) == AF_INET ? 4 : 16;         \
-    \
-    (uint32_t*)ptr[0] = (p)->id;             \
-    ptr += 4;                                \
-    \
-    memcpy(ptr, &(p)->mac.mac, 6);           \
-    ptr += 6;                                \
-    \
-    (uint16_t *)ptr[0] = (p)->rate_mask;     \
-    ptr += 2;                                \
-    \
-    ptr[0] = (p)->bits_mask;                 \
-    ptr += 1;                                \
-    \
-    (uint16_t*)ptr[0] = (p)->data_port;      \
-    ptr += 2;                                \
-    } while(0)
+void DETECT_REQUEST_ENCODE(sa_family_t sf, void *pack, const detect_request_t *req);
 
-#define DETECT_PACKAGE_DECODE(sf, p, d) do { \
-    uint8_t *ptr = (uint8_t *)(d);           \
-    \
-    (p)->ver = (ptr[0] >> 4) & 0x0F;         \
-    (p)->connected = (ptr[0] >> 3) & 0x01;   \
-    (p)->addr.type = ((ptr[0] >> 2) & 0x01) ? AF_INET6 : AF_INET;   \
-    ptr += 1;                                \
-    \
-    memcpy(&(p)->addr.ipv6, ptr, (sf) == AF_INET ? 4 : 16);\
-    ptr += (sf) == AF_INET ? 4 : 16;         \
-    \
-    (p)->id = (uint16_t*)ptr[0];             \
-    ptr += 4;                                \
-    \
-    memcpy(&(p)->mac.mac, ptr, 6);           \
-    ptr += 6;                                \
-    \
-    (p)->rate_mask = (uint16_t *)ptr[0];     \
-    ptr += 2;                                \
-    \
-    (p)->bits_mask = ptr[0];                 \
-    ptr += 1;                                \
-    \
-    (p)->data_port = (uint16_t*)ptr[0];      \
-    ptr += 2;                                \
-    } while(0)
-
-#else
-#define DETECT_REQUEST_SIZE(sf)  sizeof(detect_request_t)
-
-#define DETECT_REQUEST_ENCODE(sf, d, p) do { \
-    memcpy(d, p, DETECT_REQUEST_SIZE(sf));                                  \
-    } while(0)
-
-#define DETECT_REQUEST_DECODE(sf, p, d) do { \
-    memcpy(p, d, DETECT_REQUEST_SIZE(sf));                                  \
-    } while(0)
-#endif
+void DETECT_REQUEST_DECODE(sa_family_t sf, detect_request_t *req, const void *pack);
 
 typedef enum detect_type_e {
     DETECT_TYPE_FIRST_RUN = 1,
