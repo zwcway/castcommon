@@ -77,4 +77,9 @@ typedef struct spk_detect_response_s {
     addr_t addr;
 } spk_detect_response_t;
 
+#define spk_detect_response_size(sf)  ((sf) == AF_INET ? 5 : 17)
+
+void spk_detect_response_encode(sa_family_t sf, void *pack, const spk_detect_response_t *res);
+void spk_detect_response_decode(sa_family_t sf, spk_detect_response_t *res, const void *pack);
+
 #endif //PACKAGE_DETECT_H

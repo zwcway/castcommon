@@ -155,6 +155,28 @@ void spk_detect_request_decode(sa_family_t sf, spk_detect_request_t *req, const 
   ptr += 2;
 }
 
+void spk_detect_response_encode(sa_family_t sf, void *pack, const spk_detect_response_t *res) {
+  uint8_t *ptr = (uint8_t *) (pack);
+
+  ptr[0] = BIT_4TO8(res->ver, res->type);
+  ptr += 1;
+
+  memcpy(ptr, &res->addr.ipv6, (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr));
+  ptr += (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr);
+
+}
+
+void spk_detect_response_decode(sa_family_t sf, spk_detect_response_t *res, const void *pack) {
+  uint8_t *ptr = (uint8_t *) (pack);
+
+  BIT_8TO4(res->ver, res->type, ptr[0]);
+  ptr += 1;
+
+  memcpy(&res->addr.ipv6, ptr, (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr));
+  ptr += (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr);
+
+}
+
 /**
  * s
  * @param pack
