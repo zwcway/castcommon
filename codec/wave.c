@@ -30,7 +30,7 @@ static struct wave_format_t *format = NULL;
 static struct wave_data_t *data = NULL;
 
 
-static channel_list_t channel_list = {0};
+static channel_list_t wave_channel_list = {0};
 
 LOG_TAG_DECLR("wave");
 
@@ -98,10 +98,10 @@ uint32_t header_check(const uint8_t *wave, const size_t length)
     return 0;
   }
 
-  channel_list.len = 0;
+  wave_channel_list.len = 0;
   for (int i = 0; i < 32; ++i) {
     if (((channel_mask >> i) & 0x01) > 0) {
-      channel_list.list[channel_list.len++] = (audio_channel_t) (i + 1);
+      wave_channel_list.list[wave_channel_list.len++] = (audio_channel_t) (i + 1);
     }
   }
 
@@ -134,7 +134,7 @@ channel_list_t *get_channel_list()
     return 0;
   }
 
-  return &channel_list;
+  return &wave_channel_list;
 }
 
 int get_format(audio_format_t *f)

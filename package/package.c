@@ -16,19 +16,39 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+#include <string.h>
 #include "control.h"
 #include "detect.h"
 #include "pcm.h"
 
-void CONTROL_PACKAGE_ENCODE(void *pack, const control_package_t *ctl) {
+void control_header_encode(void *pack, const control_header_t *ctl) {
   uint8_t *ptr = (uint8_t *) (pack);
 
-  ptr[0] = ctl->cmd;
+  ptr[0] = BIT_4TO8(ctl->ver, ctl->cmd);
   ptr += 1;
   ((uint32_t *) ptr)[0] = ctl->spid;
   ptr += 4;
 
-  switch (ctl->cmd) {
+}
+
+void control_header_decode(control_header_t *ctl, const void *pack) {
+  uint8_t *ptr = (uint8_t *) (pack);
+
+  BIT_8TO4(ctl->ver, ctl->cmd, ptr[0]);
+  ptr += 1;
+  ctl->spid = ((uint32_t *) ptr)[0];
+  ptr += 4;
+}
+
+
+void control_package_encode(void *pack, const control_package_t *ctl) {
+  uint8_t *ptr = (uint8_t *) (pack);
+
+  control_header_encode(pack, &ctl->header);
+
+  ptr += sizeof(control_header_t);
+
+  switch (ctl->header.cmd) {
     case SPCMD_SAMPLE:
       ptr[0] = BIT_4TO8(ctl->sample.bits, ctl->sample.rate);
       ptr[1] = ctl->sample.channel;
@@ -40,15 +60,13 @@ void CONTROL_PACKAGE_ENCODE(void *pack, const control_package_t *ctl) {
   }
 }
 
-void CONTROL_PACKAGE_DECODE(control_package_t *ctl, const void *pack) {
-  uint8_t *ptr = (uint8_t *) (pack);
+void control_package_decode(control_package_t *ctl, const void *pack) {
+  const uint8_t *ptr = (const uint8_t *) (pack);
 
-  ctl->cmd = ptr[0];
-  ptr += 1;
-  ctl->spid = ((uint32_t *) ptr)[0];
-  ptr += 4;
+  control_header_decode(&ctl->header, pack);
+  ptr += sizeof(control_header_t);
 
-  switch (ctl->cmd) {
+  switch (ctl->header.cmd) {
     case SPCMD_SAMPLE:
       BIT_8TO4(ctl->sample.bits, ctl->sample.rate, ptr[0]);
       ctl->sample.channel = ptr[2];
@@ -60,62 +78,83 @@ void CONTROL_PACKAGE_DECODE(control_package_t *ctl, const void *pack) {
   }
 }
 
+void control_time_encode(void *pack, const control_time_t *ctl) {
+  uint8_t *ptr = (uint8_t *) (pack);
 
-void DETECT_REQUEST_ENCODE(sa_family_t sf, void *pack, const detect_request_t *req) {
+  control_header_encode(pack, &ctl->header);
+  ptr += sizeof(control_header_t);
+
+  *(int32_t *) ptr = ctl->time;
+}
+
+void control_time_decode(control_time_t *ctl, const void *pack) {
+  const uint8_t *ptr = (const uint8_t *) (pack);
+
+  control_header_decode(&ctl->header, pack);
+  ptr += sizeof(control_header_t);
+
+  ctl->time = ((int32_t *) ptr)[0];
+}
+
+void spk_detect_request_encode(sa_family_t sf, void *pack, const spk_detect_request_t *req) {
   uint8_t *ptr = (uint8_t *) (pack);
 
   *((uint8_t *) (ptr)) =
-    (((req)->ver & 0x0F) << 4) | (((req)->connected != 0) << 3) | (((req)->addr.type == AF_INET6) << 2);
+      ((req->ver & 0x0F) << 4) | ((req->connected != 0) << 3) | ((req->addr.type == AF_INET6) << 2);
   ptr += 1;
 
-  memcpy(ptr, &(req)->addr.ipv6, (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr));
+  memcpy(ptr, &req->addr.ipv6, (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr));
   ptr += (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr);
 
-  ((uint32_t *) ptr)[0] = (req)->id;
+  ((uint32_t *) ptr)[0] = req->id;
   ptr += 4;
 
-  memcpy(ptr, &(req)->mac.mac, 6);
+  memcpy(ptr, &req->mac.mac, 6);
   ptr += 6;
 
-  ((uint16_t *) ptr)[0] = (req)->rate_mask;
+  ((uint16_t *) ptr)[0] = req->rate_mask;
   ptr += 2;
 
-  ptr[0] = (req)->bits_mask;
+  ptr[0] = req->bits_mask;
   ptr += 1;
 
-  ((uint16_t *) ptr)[0] = (req)->data_port;
+  ((uint16_t *) ptr)[0] = req->data_port;
   ptr += 2;
 }
 
-void DETECT_REQUEST_DECODE(sa_family_t sf, detect_request_t *req, const void *pack) {
+void spk_detect_request_decode(sa_family_t sf, spk_detect_request_t *req, const void *pack) {
   uint8_t *ptr = (uint8_t *) (pack);
 
-  (req)->ver = (ptr[0] >> 4) & 0x0F;
-  (req)->connected = (ptr[0] >> 3) & 0x01;
-  (req)->addr.type = ((ptr[0] >> 2) & 0x01) ? AF_INET6 : AF_INET;
+  req->ver = (ptr[0] >> 4) & 0x0F;
+  req->connected = (ptr[0] >> 3) & 0x01;
+  req->addr.type = ((ptr[0] >> 2) & 0x01) ? AF_INET6 : AF_INET;
   ptr += 1;
 
-  memcpy(&(req)->addr.ipv6, ptr, (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr));
+  memcpy(&req->addr.ipv6, ptr, (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr));
   ptr += (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr);
 
-  (req)->id = ((uint16_t *) ptr)[0];
+  req->id = ((uint16_t *) ptr)[0];
   ptr += 4;
 
-  memcpy(&(req)->mac.mac, ptr, 6);
+  memcpy(&req->mac.mac, ptr, 6);
   ptr += 6;
 
-  (req)->rate_mask = ((uint16_t *) ptr)[0];
+  req->rate_mask = ((uint16_t *) ptr)[0];
   ptr += 2;
 
-  (req)->bits_mask = ptr[0];
+  req->bits_mask = ptr[0];
   ptr += 1;
 
-  (req)->data_port = ((uint16_t *) ptr)[0];
+  req->data_port = ((uint16_t *) ptr)[0];
   ptr += 2;
 }
 
-
-void PCM_HEADER_ENCODE(void *pack, const pcm_header_t *hd) {
+/**
+ * s
+ * @param pack
+ * @param hd
+ */
+void pcm_header_encode(void *pack, const pcm_header_t *hd) {
   uint8_t *ptr = (uint8_t *) pack;
 
   ptr[0] = BIT_4TO8(hd->ver, hd->compress);
@@ -133,7 +172,7 @@ void PCM_HEADER_ENCODE(void *pack, const pcm_header_t *hd) {
 
 }
 
-void PCM_HEADER_DECODE(pcm_header_t *hd, const void *pack) {
+void pcm_header_decode(pcm_header_t *hd, const void *pack) {
   uint8_t *ptr = (uint8_t *) pack;
 
   BIT_8TO4(hd->ver, hd->compress, ptr[0]);

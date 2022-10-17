@@ -142,7 +142,7 @@ void speaker_check_online(speaker_t *sp) {
     LOGI("speaker(%u,%s:%d) is offline", sp->id, addr_ntop(&sp->ip), sp->dport);
     sp->state = SPEAKER_STAT_OFFLINE;
   }
-  sp->time = 10;
+  sp->timeout = 10;
 }
 
 void pack_list_by_ch__(speaker_list_t *list) {
@@ -164,7 +164,8 @@ void pack_list_by_ch__(speaker_list_t *list) {
       }
       if (j < list->len && ns != NULL) {
         *sp = *ns;
-        if (sp != NULL) sp->idx = i;
+        if (sp != NULL)
+          sp->idx = i;
         ns->state = SPEAKER_STAT_DELETED;
         d++;
       }

@@ -36,6 +36,16 @@ typedef enum audio_bits_e
     BIT_MAX,
 } audio_bits_t;
 
+#define BITS_CPY(dst, src, bits) \
+do {                             \
+  if ((bits) <= 8)                        \
+    *(uint8_t *)(dst) = *(uint8_t *)(src); \
+  else if ((bits) <= 16)         \
+    *(uint16_t *)(dst) = *(uint16_t *)(src); \
+  else if ((bits) <= 32)         \
+    *(uint32_t *)(dst) = *(uint32_t *)(src); \
+} while(0)
+
 typedef enum audio_rate_e
 {
     RATE_NONE = 0,

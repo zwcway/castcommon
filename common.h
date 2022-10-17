@@ -81,7 +81,7 @@ goto exit_thread
 
 
 #define BIT_4TO8(a, b)      ( (((a) & 0x0F) << 4) | (((b) & 0x0F) << 0) )
-#define BIT_8TO4(a, b, s)   ( (a) = (s) >> 4 , (b) = (s) & 0x0F )
+#define BIT_8TO4(a, b, s)   ( (a) = ((s) & 0xFF) >> 4 , (b) = ((s) & 0x0F) >> 0 )
 
 typedef enum run_mode_t {
     RUN_MODE_SERVER,

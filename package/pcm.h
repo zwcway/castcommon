@@ -49,9 +49,22 @@ typedef struct channel_resp_t {
     int32_t maigc;
 } channel_resp_t;
 
-void PCM_HEADER_ENCODE(void *pack, const pcm_header_t *hd);
+/**
+ * a
+ * @param pack
+ * @param hd
 
-void PCM_HEADER_DECODE(pcm_header_t *hd, const void *pack);
++──────+──────────+───────────+──────────────+─────────────+────────+────────+
+|      | version  | compress  | sample_bits  | sampe_rate  | seq    | len    |
++──────+──────────+───────────+──────────────+─────────────+────────+────────+
+| bit  | 0-3      | 4-7       | 9-11         | 12-15       | 16-31  | 32-47  |
+| size | 4        | 4         | 4            | 4           | 16     | 16     |
++──────+──────────+───────────+──────────────+─────────────+────────+────────+
+
+ */
+void pcm_header_encode(void *pack, const pcm_header_t *hd);
+
+void pcm_header_decode(pcm_header_t *hd, const void *pack);
 
 #define CHANNEL_HEADER_SIZE (sizeof(pcm_header_t))
 #define PCM_HEADER_SIZE    11

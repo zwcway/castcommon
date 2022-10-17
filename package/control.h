@@ -28,15 +28,21 @@
 typedef enum control_command_e {
     SPCMD_SAMPLE = 1,
     SPCMD_CHUNK,
+    SPCMD_TIME,
     /**
      * speaker response the data port
      */
-    SPCMD_UNKNOWN_SP = 0xFF,
+    SPCMD_UNKNOWN_SP = 0x0F,
 } control_command_t;
 
-typedef struct control_package_s {
+typedef struct control_header_s {
+    uint8_t ver;
     control_command_t cmd;
     uint32_t spid;
+} control_header_t;
+
+typedef struct control_package_s {
+    control_header_t header;
     union {
         struct {
             audio_bits_t bits: 4;
@@ -49,29 +55,44 @@ typedef struct control_package_s {
             uint16_t size: 16;
             uint16_t reseved: 16;
         } chunk;
+        struct {
+            uint32_t server;
+            uint16_t offset;
+        } time;
     };
 } control_package_t;
 
-typedef struct control_resp_s {
-    control_command_t cmd: 8;
-    uint32_t spid;
-} control_resp_t;
-
+typedef struct control_time_s {
+    control_header_t header;
+    uint64_t time;
+} control_time_t;
 
 #define CONTROL_PACKAGE_SIZE  (9)
+#define CONTROL_TIME_SIZE  (6)
 
-void CONTROL_PACKAGE_ENCODE(void *pack, const control_package_t *ctl);
+void control_header_encode(void *pack, const control_header_t *ctl);
 
-void CONTROL_PACKAGE_DECODE(control_package_t *ctl, const void *pack);
+void control_header_decode(control_header_t *ctl, const void *pack);
+
+void control_package_encode(void *pack, const control_package_t *ctl);
+
+void control_package_decode(control_package_t *ctl, const void *pack);
+
+void control_time_encode(void *pack, const control_time_t *ctl);
+
+void control_time_decode(control_time_t *ctl, const void *pack);
 
 /**
  *  header size
  */
 #define CONTROL_RESP_SIZE     \
-    sizeof(control_resp_t)
+    sizeof(control_header_t)
 
-#define CONTROL_IS_CMD(buf, c)        \
-    (((control_resp_t *)(buf))->cmd == (c))
+bool control_is_cmd(const void *buf, control_command_t c) {
+  control_header_t h;
+  control_header_decode(&h, buf);
+  return h.cmd == c;
+}
 
 
 #endif //PACKAGE_CONTROL_H

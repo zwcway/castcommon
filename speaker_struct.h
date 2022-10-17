@@ -23,6 +23,7 @@
 #include <stdint-gcc.h>
 #include "audio.h"
 #include "ip.h"
+#include "common.h"
 
 
 #define DEFAULT_MULTICAST_GROUP "239.44.77.16"
@@ -70,12 +71,17 @@ typedef struct speaker_t {
     speaker_line_t line;
     uint8_t mode;
     uint16_t dport;
+    uint8_t supported;
     struct {
         audio_rate_mask_t rate_mask;
         audio_bits_mask_t bits_mask;
         audio_channel_t channel;
     };
-    int time;
+    struct {
+        socket_t fd;
+    };
+    int timeout;
+    uint64_t conn_time;
     speaker_state_t state;
     speaker_statistic_t statistic;
 } speaker_t;
@@ -103,16 +109,7 @@ typedef struct speaker_flat_list_t
         ++_i)
 
 
-#define SPEAKER_STRUCT_INIT(sp, d, m, a, c) \
-  (sp).idx = 0; \
-  (sp).id = d; \
-(sp).mac = *(m); \
-(sp).ip = *(a);\
-(sp).state = SPEAKER_STAT_OFFLINE; \
-(sp).line = DEFAULT_LINE; \
-(sp).channel = c;
-
-#define SPEAKER_STRUCT_INIT_FROM_HEADER(sp, hd, c)  \
+#define SPEAKER_STRUCT_INIT_FROM_HEADER(sp, hd)  \
   do {                                              \
     (sp)->idx = 0;                                  \
     (sp)->id = (hd)->id;                            \
@@ -121,12 +118,14 @@ typedef struct speaker_flat_list_t
     (sp)->dport = (hd)->data_port;                  \
     (sp)->mac = (hd)->mac;                          \
     (sp)->ip = (hd)->addr;                          \
-    (sp)->state = SPEAKER_STAT_OFFLINE;             \
-    (sp)->line = DEFAULT_LINE;                      \
-    (sp)->channel = c;                              \
+    (sp)->state = SPEAKER_STAT_OFFLINE;          \
+    (sp)->fd = -1;                               \
   } while(0)
 
-#define SPEAKER_ON_LINE(sp)   ((sp)->state == SPEAKER_STAT_ONLINE)
+#define SPEAKER_ONLINE(sp)   ((sp)->state = SPEAKER_STAT_ONLINE)
+#define SPEAKER_OFFLINE(sp)   ((sp)->state = SPEAKER_STAT_OFFLINE)
+#define SPEAKER_IS_ONLINE(sp)   ((sp)->state == SPEAKER_STAT_ONLINE)
+#define SPEAKER_SUPPORTED(sp)   ((sp)->supported == 1)
 
 #define SPEAKERLIST_GET(line, ch)       (&speakers_list_ch[(line)][(ch)])
 #define SPEAKERLIST_ADD(line, ch, sp)   SPEAKERLIST_GET(line, ch)->speakers[SPEAKERLIST_GET(line, ch)->len++] = (sp);

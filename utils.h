@@ -36,7 +36,10 @@ typedef enum chunk_type_t {
 
 inline static void *xmalloc(size_t len) {
   void *a = malloc(len);
-  if (a == NULL) perror("malloc error"), exit(255);
+  if (a == NULL) {
+    perror("malloc error");
+    exit(255);
+  }
   return a;
 }
 
