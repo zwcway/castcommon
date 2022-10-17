@@ -63,7 +63,7 @@ typedef struct speaker_statistic_t
     uint32_t drop;  // droped size
 } speaker_statistic_t;
 
-typedef struct speaker_t {
+typedef struct speaker_s {
     uint8_t idx;
     speaker_id_t id;
     mac_address_t mac;

@@ -69,6 +69,10 @@ int is_multicast_addr(const char *ip);
 
 int addr_stoa(addr_t *addr, const char *ip);
 
+int is_addr_valid(const addr_t *addr);
+
+void addr_reset(addr_t *addr);
+
 in_addr_t ip_addr(const char *ip);
 
 int set_sockaddr(struct sockaddr_storage *__restrict dst, const addr_t *__restrict src, uint32_t port);

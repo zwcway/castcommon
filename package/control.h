@@ -88,11 +88,7 @@ void control_time_decode(control_time_t *ctl, const void *pack);
 #define CONTROL_RESP_SIZE     \
     sizeof(control_header_t)
 
-bool control_is_cmd(const void *buf, control_command_t c) {
-  control_header_t h;
-  control_header_decode(&h, buf);
-  return h.cmd == c;
-}
+bool control_is_cmd(const void *buf, control_command_t c);
 
 
 #endif //PACKAGE_CONTROL_H

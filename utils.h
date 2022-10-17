@@ -22,8 +22,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "speaker_struct.h"
-
+#include <stdint.h>
 
 #define FLOAT_IS_NUMBER(i) ((i) - (int)(i) == 0)
 

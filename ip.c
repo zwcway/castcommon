@@ -73,6 +73,29 @@ int addr_stoa(addr_t *addr, const char *ip) {
   return OK;
 }
 
+int is_addr_valid(const addr_t *addr) {
+  if (addr == NULL)
+    return 0;
+
+  switch (addr->type) {
+    case AF_INET:
+      return addr->ipv4.s_addr > 0;
+    case AF_INET6:
+      return ((uint64_t *) &addr->ipv6)[0] > 0;
+    default:
+      return 0;
+  }
+
+  return 1;
+}
+
+void addr_reset(addr_t *addr) {
+  if (addr == NULL)
+    return;
+
+  memset(addr, 0, sizeof(addr_t));
+}
+
 in_addr_t ip_addr(const char *ip) {
   return inet_addr(ip);
 }
@@ -548,5 +571,4 @@ int get_interface(sa_family_t sf, interface_t *ift, const char *name) {
   closesocket(sockfd);
   return 0;
 }
-
 #endif

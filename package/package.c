@@ -96,6 +96,12 @@ void control_time_decode(control_time_t *ctl, const void *pack) {
   ctl->time = ((int32_t *) ptr)[0];
 }
 
+bool control_is_cmd(const void *buf, control_command_t c) {
+  control_header_t h;
+  control_header_decode(&h, buf);
+  return h.cmd == c;
+}
+
 void spk_detect_request_encode(sa_family_t sf, void *pack, const spk_detect_request_t *req) {
   uint8_t *ptr = (uint8_t *) (pack);
 
