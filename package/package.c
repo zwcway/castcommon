@@ -173,6 +173,7 @@ void spk_detect_response_decode(sa_family_t sf, spk_detect_response_t *res, cons
   ptr += 1;
 
   memcpy(&res->addr.ipv6, ptr, (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr));
+  res->addr.type = sf;
   ptr += (sf) == AF_INET ? sizeof(struct in_addr) : sizeof(struct in6_addr);
 
 }
